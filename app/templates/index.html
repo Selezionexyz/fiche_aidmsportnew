@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Générateur de Fiches Produits</title>
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/modern-normalize/1.1.0/modern-normalize.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      /* Palette inspirée du thème bleu de la version originale */
+      :root {
+        --primary: #1e6cf0;
+        --primary-light: #4a8ef5;
+        --secondary: #f5f5f5;
+        --text: #222;
+        --accent: #ff9f00;
+      }
+      body {
+        font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        margin: 0;
+        background: var(--secondary);
+        color: var(--text);
+      }
+      header {
+        background: var(--primary);
+        color: white;
+        padding: 1rem;
+        text-align: center;
+      }
+      main {
+        max-width: 800px;
+        margin: 2rem auto;
+        padding: 1rem;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      h1 {
+        margin: 0;
+        font-size: 1.6rem;
+      }
+      form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+      }
+      label {
+        font-weight: 600;
+      }
+      input[type="text"] {
+        padding: 0.5rem;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 1rem;
+      }
+      button {
+        padding: 0.6rem 1.2rem;
+        background: var(--primary);
+        color: white;
+        border: none;
+        border-radius: 4px;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      button:hover {
+        background: var(--primary-light);
+      }
+      .product-card {
+        margin-top: 1rem;
+        padding: 1rem;
+        border: 1px solid #eee;
+        border-radius: 6px;
+        display: flex;
+        gap: 1rem;
+      }
+      .product-image {
+        flex: 0 0 200px;
+        height: 200px;
+        background-position: center;
+        background-size: cover;
+        border-radius: 4px;
+        border: 1px solid #ddd;
+      }
+      .product-details {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+      }
+      .price {
+        color: var(--accent);
+        font-size: 1.2rem;
+        font-weight: 700;
+      }
+      .export-link {
+        margin-top: 0.5rem;
+        display: inline-block;
+        font-size: 0.9rem;
+        color: var(--primary);
+      }
+      .history {
+        margin-top: 2rem;
+      }
+      .history h2 {
+        margin-bottom: 0.5rem;
+      }
+      .history-item {
+        padding: 0.8rem;
+        border-bottom: 1px solid #eee;
+        display: flex;
+        justify-content: space-between;
+      }
+      .history-item:last-child {
+        border-bottom: none;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Générateur de Fiches Produits</h1>
+      <p>Créez rapidement des fiches produit à partir d'un code EAN ou SKU.</p>
+    </header>
+    <main>
+      <form id="search-form">
+        <div>
+          <label for="ean">Code EAN (13 chiffres)</label>
+          <input type="text" id="ean" name="ean" placeholder="Ex : 3608077027028" />
+        </div>
+        <div>
+          <label for="sku">Référence SKU</label>
+          <input type="text" id="sku" name="sku" placeholder="Ex : 48SMA0097-21G" />
+        </div>
+        <button type="submit">Rechercher</button>
+      </form>
+      <div id="result"></div>
+      {% if products %}
+      <section class="history">
+        <h2>Fiches récemment créées</h2>
+        {% for prod in products %}
+        <div class="history-item">
+          <span>{{ prod.name }}</span>
+          <a href="/api/export/{{ prod.id }}" target="_blank" class="export-link">Exporter CSV</a>
+        </div>
+        {% endfor %}
+      </section>
+      {% endif %}
+    </main>
+    <script>
+      const form = document.getElementById('search-form');
+      const resultDiv = document.getElementById('result');
+      form.addEventListener('submit', async (ev) => {
+        ev.preventDefault();
+        resultDiv.innerHTML = '';
+        const ean = document.getElementById('ean').value.trim();
+        const sku = document.getElementById('sku').value.trim();
+        if (!ean && !sku) {
+          alert('Veuillez saisir un code EAN ou un SKU.');
+          return;
+        }
+        try {
+          const res = await fetch('/api/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ean: ean || null, sku: sku || null }),
+          });
+          const data = await res.json();
+          if (data.success) {
+            const product = data.product;
+            // Render product card
+            const card = document.createElement('div');
+            card.className = 'product-card';
+            const imgDiv = document.createElement('div');
+            imgDiv.className = 'product-image';
+            if (product.image) {
+              imgDiv.style.backgroundImage = `url('${product.image}')`;
+            } else {
+              imgDiv.style.backgroundColor = '#f0f0f0';
+            }
+            const details = document.createElement('div');
+            details.className = 'product-details';
+            details.innerHTML = `
+              <h3>${product.name}</h3>
+              ${product.brand ? `<p><strong>Marque :</strong> ${product.brand}</p>` : ''}
+              ${product.category ? `<p><strong>Catégorie :</strong> ${product.category}</p>` : ''}
+              ${product.price ? `<p class="price">${product.price.toFixed(2)} €</p>` : ''}
+              <p>${product.description}</p>
+              <a href="/api/export/${product.id}" target="_blank" class="export-link">Télécharger la fiche CSV</a>
+            `;
+            card.appendChild(imgDiv);
+            card.appendChild(details);
+            resultDiv.appendChild(card);
+          } else {
+            resultDiv.textContent = 'Produit non trouvé.';
+          }
+        } catch (e) {
+          console.error(e);
+          alert("Une erreur est survenue lors de la recherche du produit.");
+        }
+      });
+    </script>
+  </body>
+</html>
